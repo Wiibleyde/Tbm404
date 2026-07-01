@@ -1,0 +1,50 @@
+# Production: pulls prebuilt images from GHCR instead of building locally.
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+# Reverse proxy / HTTPS is handled outside this file (app is exposed on :3000).
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tbm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: tbm404
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Not published to the host: only app + collector reach it over the compose network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tbm -d tbm404"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: ghcr.io/wiibleyde/tbm404-app:${IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://tbm:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tbm404
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  collector:
+    image: ghcr.io/wiibleyde/tbm404-collector:${IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://tbm:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tbm404
+      SIRI_URL: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/general-message.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt
+      GTFS_URL: https://bdx.mecatran.com/utw/ws/gtfsfeed/static/bordeaux?apiKey=opendata-bordeaux-metropole-flux-gtfs-rt
+      POLL_INTERVAL_SECONDS: "180"
+      GTFS_REFRESH_HOURS: "24"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
