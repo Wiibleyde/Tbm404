@@ -30,7 +30,7 @@ export default async function LinePage({ params }: PageProps) {
   if (!detail) notFound();
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-10 px-4 py-8 sm:px-6 sm:py-12">
+    <main className="mx-auto flex max-w-3xl flex-col gap-10 px-4 py-8 sm:px-6 sm:py-12">
       <LineHeader line={detail.line} disrupted={detail.disrupted} />
 
       <LineStats stats={detail.stats} />

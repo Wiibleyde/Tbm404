@@ -1,3 +1,4 @@
+import { SiteFooter } from "@/components/SiteFooter";
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
@@ -24,7 +25,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className={`${spaceGrotesk.variable} ${plexMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <div className="flex min-h-dvh flex-col">
+          <div className="flex-1">{children}</div>
+          <SiteFooter />
+        </div>
+      </body>
     </html>
   );
 }

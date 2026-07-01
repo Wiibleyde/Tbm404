@@ -13,7 +13,7 @@ export default async function HomePage() {
   const status = await getNetworkStatus();
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-5xl flex-col gap-10 px-4 py-8 sm:px-6 sm:py-12">
+    <main className="mx-auto flex max-w-5xl flex-col gap-10 px-4 py-8 sm:px-6 sm:py-12">
       <header className="flex items-center justify-between">
         <div className="flex items-baseline gap-2">
           <span
@@ -30,6 +30,12 @@ export default async function HomePage() {
             className="font-mono text-xs text-ink/50 transition-colors hover:text-ink"
           >
             lignes →
+          </Link>
+          <Link
+            href="/historique"
+            className="font-mono text-xs text-ink/50 transition-colors hover:text-ink"
+          >
+            historique →
           </Link>
           <CollectorPulse healthy={status.collectorHealthy} lastPollAt={status.lastPollAt} />
         </div>
@@ -68,13 +74,6 @@ export default async function HomePage() {
           <IncidentList incidents={status.works} />
         </section>
       )}
-
-      <footer className="mt-auto border-t border-paper-2 pt-6 font-mono text-xs text-ink/40">
-        <p>
-          Données collectées en continu depuis le flux SIRI-Lite officiel TBM. Sévérité et catégorie
-          estimées automatiquement. Projet indépendant, non affilié à TBM / Keolis.
-        </p>
-      </footer>
     </main>
   );
 }
