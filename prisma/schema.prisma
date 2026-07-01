@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransportMode {
+  TRAM
+  BUS
+  BOAT
+  OTHER
+}
+
+enum InfoChannel {
+  PERTURBATION
+  INFORMATION
+}
+
+// Derived, not present in SIRI. Splits stats: real disruptions vs works vs noise.
+enum IncidentCategory {
+  UNPLANNED // ponctuel / imprévu
+  PLANNED_WORKS // travaux programmés longue durée
+  RECURRING // récurrent (marché, événement hebdomadaire)
+  INFORMATION // info non perturbante
+}
+
+enum Severity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+model Line {
+  id        String         @id // SIRI LineRef, e.g. bordeaux:Line:07:LOC
+  code      String         @unique // GTFS route_id, e.g. "07", "A"
+  shortName String
+  longName  String?
+  mode      TransportMode
+  color     String? // GTFS route_color (hex)
+  textColor String? // GTFS route_text_color (hex)
+  sortOrder Int            @default(0)
+  active    Boolean        @default(true) // present in current GTFS
+  incidents IncidentLine[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model Incident {
+  id          String             @id // SIRI InfoMessageIdentifier
+  channel     InfoChannel
+  category    IncidentCategory
+  severity    Severity? // derived heuristic, null when not meaningful
+  title       String // SIRI shortMessage
+  description String?            @db.Text // SIRI longMessage
+  stopRefs    String[] // SIRI StopPointRef values
+  sourceUrl   String?
+  version     Int // SIRI InfoMessageVersion, last seen
+  validUntil  DateTime?
+  startsAt    DateTime? // event start parsed from the title ("9 et 10/07 : ..."); null if none
+  startedAt   DateTime // first poll that observed this incident
+  endedAt     DateTime? // first poll where it was gone from the flux
+  lastSeenAt  DateTime
+  active      Boolean            @default(true)
+  lines       IncidentLine[]
+  revisions   IncidentRevision[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([active])
+  @@index([startedAt])
+  @@index([category])
+}
+
+model IncidentLine {
+  incidentId String
+  lineId     String
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  line       Line     @relation(fields: [lineId], references: [id])
+
+  @@id([incidentId, lineId])
+  @@index([lineId])
+}
+
+// Content history: a new row each time the message text or version changes.
+model IncidentRevision {
+  id          Int      @id @default(autoincrement())
+  incidentId  String
+  incident    Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  version     Int
+  title       String
+  description String?  @db.Text
+  observedAt  DateTime @default(now())
+
+  @@index([incidentId, observedAt])
+}
+
+// Poll audit: uptime + gap detection, so downtime isn't misread as "resolved".
+model PollLog {
+  id           Int      @id @default(autoincrement())
+  startedAt    DateTime @default(now())
+  durationMs   Int
+  ok           Boolean
+  messageCount Int?
+  newCount     Int?
+  endedCount   Int?
+  error        String?
+
+  @@index([startedAt])
+}

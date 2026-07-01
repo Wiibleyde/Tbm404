@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --color-cyan: #00b1eb;
+  --color-ink: #0a1826;
+  --color-paper: #f4f6f8;
+  --color-paper-2: #e7ebef;
+  --color-alert: #e50040;
+  --color-warn: #f08700;
+  --color-ok: #00a98b;
+
+  --color-tram-a: #831f82;
+  --color-tram-b: #e50040;
+  --color-tram-c: #d35098;
+  --color-tram-d: #9262a3;
+  --color-tram-e: #967651;
+  --color-tram-f: #f08700;
+}
+
+:root {
+  /* Data-driven glitch amount, 0..1, overridden inline from the disruption ratio. */
+  --glitch: 0;
+}
+
+html,
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--color-cyan);
+  color: var(--color-ink);
+}
+
+/* Paper grid, faintly torn by glitch. */
+.paper-grid {
+  background-image: linear-gradient(var(--color-paper-2) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-paper-2) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(circle at 50% 0%, black, transparent 80%);
+}
+
+/* Scanlines overlay, opacity scales with glitch intensity. */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(10, 24, 38, 0.06) 0px,
+    rgba(10, 24, 38, 0.06) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+  opacity: calc(0.15 + var(--glitch) * 0.85);
+  mix-blend-mode: multiply;
+  animation: scan 6s linear infinite;
+}
+
+@keyframes scan {
+  from {
+    background-position-y: 0;
+  }
+  to {
+    background-position-y: 100px;
+  }
+}
+
+/* Chromatic-aberration text. Offset grows with glitch intensity. */
+.glitch-text {
+  position: relative;
+  display: inline-block;
+}
+
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: calc(0.35 + var(--glitch) * 0.65);
+  clip-path: inset(0 0 0 0);
+}
+
+.glitch-text::before {
+  color: var(--color-alert);
+  transform: translateX(calc(var(--glitch) * -0.06em));
+  animation: shift-a calc(2.4s - var(--glitch) * 1.6s) steps(2) infinite;
+}
+
+.glitch-text::after {
+  color: var(--color-cyan);
+  transform: translateX(calc(var(--glitch) * 0.06em));
+  animation: shift-b calc(3.1s - var(--glitch) * 2s) steps(2) infinite;
+}
+
+@keyframes shift-a {
+  0%,
+  92%,
+  100% {
+    transform: translateX(calc(var(--glitch) * -0.06em));
+    clip-path: inset(0 0 0 0);
+  }
+  94% {
+    transform: translateX(calc(var(--glitch) * -0.4em));
+    clip-path: inset(20% 0 55% 0);
+  }
+  96% {
+    clip-path: inset(70% 0 5% 0);
+  }
+}
+
+@keyframes shift-b {
+  0%,
+  90%,
+  100% {
+    transform: translateX(calc(var(--glitch) * 0.06em));
+    clip-path: inset(0 0 0 0);
+  }
+  93% {
+    transform: translateX(calc(var(--glitch) * 0.5em));
+    clip-path: inset(60% 0 15% 0);
+  }
+  97% {
+    clip-path: inset(10% 0 65% 0);
+  }
+}
+
+/* Occasional horizontal slice displacement on a whole block. */
+.datamosh {
+  animation: slice calc(7s - var(--glitch) * 4s) steps(1) infinite;
+}
+
+@keyframes slice {
+  0%,
+  96%,
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+  97% {
+    clip-path: inset(30% 0 40% 0);
+    transform: translateX(calc(var(--glitch) * 8px));
+  }
+  98% {
+    clip-path: inset(65% 0 12% 0);
+    transform: translateX(calc(var(--glitch) * -10px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanlines::after,
+  .glitch-text::before,
+  .glitch-text::after,
+  .datamosh {
+    animation: none;
+  }
+}
