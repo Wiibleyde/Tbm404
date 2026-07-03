@@ -1,4 +1,5 @@
 import { IncidentCategory, type TransportMode } from "@/generated/prisma/client";
+import { isHiddenLine } from "./line-filter";
 import { prisma } from "./prisma";
 
 export type HistoryGrain = "day" | "month" | "year";
@@ -77,6 +78,8 @@ export async function getHistory(grain: HistoryGrain, now = new Date()): Promise
     }
 
     for (const { line } of incident.lines) {
+      // Keep hidden lines (navettes, SCODI…) out of the "top affected lines" ranking.
+      if (isHiddenLine(line)) continue;
       const entry = lineTally.get(line.id) ?? {
         code: line.code,
         shortName: line.shortName,
