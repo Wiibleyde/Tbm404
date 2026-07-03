@@ -4,6 +4,7 @@ import {
   type Severity,
   type TransportMode,
 } from "@/generated/prisma/client";
+import { isHiddenLine } from "./line-filter";
 import { prisma } from "./prisma";
 
 export interface StatusLine {
@@ -60,12 +61,16 @@ const SEVERITY_ORDER: Severity[] = ["CRITICAL", "MAJOR", "MINOR"];
 // standing deviations that would otherwise keep the ratio permanently high, so they're
 // reported separately and never fold into the disruption ratio.
 export async function getNetworkStatus(now = new Date()): Promise<NetworkStatus> {
-  let modeGroups: Array<{ mode: TransportMode; _count: { _all: number } }>;
+  let lineRows: Array<{ mode: TransportMode; shortName: string; longName: string | null }>;
   let active: IncidentWithLines[];
   let lastPoll: { startedAt: Date } | null;
   try {
-    [modeGroups, active, lastPoll] = await Promise.all([
-      prisma.line.groupBy({ by: ["mode"], where: { active: true }, _count: { _all: true } }),
+    [lineRows, active, lastPoll] = await Promise.all([
+      // Group in JS (not a DB groupBy) so hidden lines are dropped from the denominator.
+      prisma.line.findMany({
+        where: { active: true },
+        select: { mode: true, shortName: true, longName: true },
+      }),
       prisma.incident.findMany({
         where: {
           active: true,
@@ -83,18 +88,26 @@ export async function getNetworkStatus(now = new Date()): Promise<NetworkStatus>
     return emptyStatus(now);
   }
 
+  const modeGroups = countVisibleByMode(lineRows);
   const activeLineCount = modeGroups.reduce((sum, group) => sum + group._count._all, 0);
 
   // A future-dated event (startsAt > now, parsed from the title) is announced but not
   // disrupting yet, so it must NOT inflate the live %. It's surfaced under `upcoming`.
   const hasStarted = (i: IncidentWithLines) => i.startsAt === null || i.startsAt <= now;
 
+  // toStatusIncident strips hidden lines; an incident left with no visible line is one
+  // that only touched hidden lines (a navette, a SCODI…) so it's dropped entirely.
+  const hasVisibleLine = (i: StatusIncident) => i.lines.length > 0;
   const unplanned = active.filter((i) => i.category === IncidentCategory.UNPLANNED);
-  const incidents = unplanned.filter(hasStarted).map(toStatusIncident);
-  const upcoming = unplanned.filter((i) => !hasStarted(i)).map(toStatusIncident);
+  const incidents = unplanned.filter(hasStarted).map(toStatusIncident).filter(hasVisibleLine);
+  const upcoming = unplanned
+    .filter((i) => !hasStarted(i))
+    .map(toStatusIncident)
+    .filter(hasVisibleLine);
   const works = active
     .filter((i) => i.category === IncidentCategory.PLANNED_WORKS && hasStarted(i))
-    .map(toStatusIncident);
+    .map(toStatusIncident)
+    .filter(hasVisibleLine);
 
   const disruptedLineIds = collectLineIds(incidents);
   const worksLineIds = collectLineIds(works);
@@ -120,6 +133,19 @@ export async function getNetworkStatus(now = new Date()): Promise<NetworkStatus>
     lastPollAt: lastPollAt?.toISOString() ?? null,
     collectorHealthy,
   };
+}
+
+// Count active, non-hidden lines per mode — replaces a DB groupBy so the exclusion
+// (SCODI, navettes, Bus Relais, Flex, TBNight, festivals) applies to the denominator.
+function countVisibleByMode(
+  lines: Array<{ mode: TransportMode; shortName: string; longName: string | null }>,
+): Array<{ mode: TransportMode; _count: { _all: number } }> {
+  const counts = new Map<TransportMode, number>();
+  for (const line of lines) {
+    if (isHiddenLine(line)) continue;
+    counts.set(line.mode, (counts.get(line.mode) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([mode, n]) => ({ mode, _count: { _all: n } }));
 }
 
 function buildModeBreakdown(
@@ -197,6 +223,7 @@ function toStatusIncident(incident: IncidentWithLines): StatusIncident {
     startedAt: incident.startedAt.toISOString(),
     startsAt: incident.startsAt?.toISOString() ?? null,
     lines: incident.lines
+      .filter(({ line }) => !isHiddenLine(line))
       .map(({ line }) => ({
         id: line.id,
         code: line.code,

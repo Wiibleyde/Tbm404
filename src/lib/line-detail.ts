@@ -1,4 +1,5 @@
 import { IncidentCategory, type Severity, type TransportMode } from "@/generated/prisma/client";
+import { isHiddenLine } from "./line-filter";
 import { prisma } from "./prisma";
 
 export interface LineInfo {
@@ -66,7 +67,7 @@ async function loadLineDetail(slug: string, now: Date): Promise<LineDetail | nul
     (await prisma.line.findFirst({
       where: { shortName: { equals: slug, mode: "insensitive" } },
     })) ?? (await prisma.line.findUnique({ where: { code: slug } }));
-  if (!line) return null;
+  if (!line || isHiddenLine(line)) return null;
 
   const links = await prisma.incidentLine.findMany({
     where: { lineId: line.id },
@@ -114,6 +115,7 @@ export async function getLinesIndex(now = new Date()): Promise<LineSummary[]> {
   }
 
   return lines
+    .filter((line) => !isHiddenLine(line))
     .map((line) => {
       // Exclude future-dated events: they're active in the flux but not disrupting yet.
       const current = line.incidents
