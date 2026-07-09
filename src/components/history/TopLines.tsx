@@ -22,6 +22,7 @@ export function TopLines({ lines }: { lines: AffectedLine[] }) {
           <Link
             key={line.code}
             href={`/lignes/${encodeURIComponent(line.shortName)}`}
+            prefetch={false}
             className="flex items-center gap-3 rounded-xl border border-paper-2 bg-white p-3 transition-colors hover:border-ink/20"
           >
             <LineBadge line={line} size="sm" />
