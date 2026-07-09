@@ -28,7 +28,7 @@ export function LineBadge({ line, size = "md", href }: LineBadgeProps) {
 
   if (href) {
     return (
-      <Link href={href} className={className} style={style} title={line.shortName}>
+      <Link href={href} prefetch={false} className={className} style={style} title={line.shortName}>
         {line.shortName}
       </Link>
     );
