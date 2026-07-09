@@ -27,9 +27,6 @@ export function LineBadge({ line, size = "md", href }: LineBadgeProps) {
   const style = { backgroundColor: bg, color: fg };
 
   if (href) {
-    // No eager prefetch: a badge can appear dozens of times per page (one per affected
-    // line, per incident). Prefetching each on viewport entry floods the server with RSC
-    // requests for force-dynamic line pages. The route still prefetches on hover/touch.
     return (
       <Link href={href} prefetch={false} className={className} style={style} title={line.shortName}>
         {line.shortName}
